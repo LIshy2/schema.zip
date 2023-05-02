@@ -35,8 +35,8 @@ def show(scheme: Scheme): String =
     case Scheme.Number(value) => value.toString
     case Scheme.Str(value) => "\"" + value + "\""
     case Scheme.Bool(value) => if value then "#t" else "#f"
-    case Scheme.Func(params, body, _, None) => "(lambda (" + params.mkString(" ") + ") (" + body.map(show) + "))"
-    case Scheme.Func(params, body, _, Some(vararg)) => "(lambda (" + params.mkString(" ") + " . " + vararg + ") (" + body.map(show) + "))"
+    case Scheme.Func(params, body, _, None) => "(lambda (" + params.mkString(" ") + ") (" + body.map(show).mkString(" ") + "))"
+    case Scheme.Func(params, body, _, Some(vararg)) => "(lambda (" + params.mkString(" ") + " . " + vararg + ") (" + body.map(show).mkString(" ") + "))"
     case Scheme.PrimitiveOperator(PrimitiveFunc(name, _)) => name
 
 
