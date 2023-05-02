@@ -13,7 +13,7 @@ The interpreter also supports the following command-line options:
 
 For example, to launch the REPL, run:
 
-`schemezip  --i`
+`schemezip --i`
 
 To execute a Scheme program from a file named myprogram.scm, run:
 
@@ -25,15 +25,15 @@ To execute a Scheme program from a file named myprogram.scm, run:
 
 The interpreter supports the following Scheme R5RS features:
 
-| Feature    | Supported          |
-|------------|--------------------|
-| define     | :heavy_check_mark: |
-| lambda     | :heavy_check_mark: |
-| arithmetic | :heavy_check_mark: |
-| lists      | :heavy_check_mark: |
-| vectors    | :x:                |
-| macros     | :x:                |
-| call/cc    | :x:                |
+| Feature    | Supported    |
+|------------|--------------|
+| define     | :check_mark: |
+| lambda     | :check_mark: |
+| arithmetic | :check_mark: |
+| lists      | :check_mark: |
+| vectors    | :x:          |
+| macros     | :x:          |
+| call/cc    | :x:          |
 
 ## Running Tests
 
