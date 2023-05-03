@@ -56,4 +56,12 @@ object Context:
       "make-vector" -> wrapPrimitive("make-vector", Primitives[M].vectorMake),
       "vector-set!" -> wrapPrimitive("vector-set!", Primitives[M].vectorSet),
       "vector-ref" -> wrapPrimitive("vector-ref", Primitives[M].vectorRef),
+      "make-vector" -> wrapPrimitive("make-vector", Primitives[M].vectorMake),
+      "open-input-file" -> wrapPrimitive("vector-set!", arg => Primitives[M].makePort(FileMode.Reader, arg)),
+      "open-output-file" -> wrapPrimitive("vector-ref", arg => Primitives[M].makePort(FileMode.Writer, arg)),
+      "close-input-port" -> wrapPrimitive("vector-ref", Primitives[M].closePort),
+      "close-output-port" -> wrapPrimitive("vector-ref", Primitives[M].closePort),
+      "read" -> wrapPrimitive("vector-ref", Primitives[M].read),
+      "write" -> wrapPrimitive("vector-ref", Primitives[M].write),
+      "read-contents" -> wrapPrimitive("vector-ref", Primitives[M].readContents),
     ))

@@ -32,7 +32,7 @@ The interpreter supports the following Scheme R5RS features:
 | arithmetic | :white_check_mark: |
 | lists      | :white_check_mark: |
 | vectors    | :white_check_mark: |
-| ports      | :x:                |
+| ports      | :white_check_mark: |
 | macros     | :x:                |
 | call/cc    | :x:                |
 

@@ -10,11 +10,16 @@ import cats.syntax.*
 import com.sun.org.apache.xpath.internal.operations.Minus
 import interpreter.RuntimeError.TypeMismatch
 
+import java.io.{BufferedReader, PrintWriter}
 import scala.annotation.tailrec
 
 
 case class PrimitiveFunc[M[_]](name: String, f: List[Scheme] => M[Scheme]):
   def apply(args: List[Scheme]): M[Scheme] = f(args)
+
+enum PortHandler:
+  case WriterPort(writer: PrintWriter)
+  case ReaderPort(reader: BufferedReader)
 
 enum Scheme:
   case Atom(value: String)
@@ -27,19 +32,21 @@ enum Scheme:
   case DottedList(head: List[Scheme], tail: Scheme)
   case PrimitiveOperator[M[_]](func: PrimitiveFunc[M])
   case Func(params: List[String], body: List[Scheme], closure: Context, vararg: Option[String])
+  case Port(port: PortHandler)
 
 
-def show(scheme: Scheme): String =
+def mkString(scheme: Scheme): String =
   scheme match
     case Scheme.Atom(value) => value
-    case Scheme.SList(list) => "(" + list.map(show).mkString(" ") + ")"
-    case Scheme.DottedList(head, tail) => "(" + head.map(show).mkString(" ") + " . " + tail + ")"
+    case Scheme.SList(list) => "(" + list.map(mkString).mkString(" ") + ")"
+    case Scheme.DottedList(head, tail) => "(" + head.map(mkString).mkString(" ") + " . " + tail + ")"
     case Scheme.Number(value) => value.toString
     case Scheme.Str(value) => "\"" + value + "\""
     case Scheme.Bool(value) => if value then "#t" else "#f"
-    case Scheme.Func(params, body, _, None) => "(lambda (" + params.mkString(" ") + ") (" + body.map(show).mkString(" ") + "))"
-    case Scheme.Func(params, body, _, Some(vararg)) => "(lambda (" + params.mkString(" ") + " . " + vararg + ") (" + body.map(show).mkString(" ") + "))"
+    case Scheme.Func(params, body, _, None) => "(lambda (" + params.mkString(" ") + ") (" + body.map(mkString).mkString(" ") + "))"
+    case Scheme.Func(params, body, _, Some(vararg)) => "(lambda (" + params.mkString(" ") + " . " + vararg + ") (" + body.map(mkString).mkString(" ") + "))"
     case Scheme.PrimitiveOperator(PrimitiveFunc(name, _)) => name
+    case Scheme.Port(_) => "<port>"
 
 
 def checkArgsCount(params: List[String], vararg: Option[String], args: List[Scheme]) =
@@ -117,18 +124,18 @@ def interpret[F[_]](scheme: Scheme)(using InjectK[InterpreterAlg, F])(using Inje
       yield newValue
     case Scheme.SList(Scheme.Atom("define") :: Scheme.SList(Scheme.Atom(id) :: params) :: body) =>
       for
-        func <- Interpreter.lambda(params.map(show), body, None)
+        func <- Interpreter.lambda(params.map(mkString), body, None)
         _ <- Interpreter.binding(id, func)
       yield func
     case Scheme.SList(Scheme.Atom("define") :: Scheme.DottedList(Scheme.Atom(id) :: params, vararg) :: body) =>
       for
-        func <- Interpreter.lambda(params.map(show), body, Some(show(vararg)))
+        func <- Interpreter.lambda(params.map(mkString), body, Some(mkString(vararg)))
         _ <- Interpreter.binding(id, func)
       yield func
     case Scheme.SList(Scheme.Atom("lambda") :: Scheme.SList(params) :: body) =>
-      Interpreter.lambda(params.map(show), body, None)
+      Interpreter.lambda(params.map(mkString), body, None)
     case Scheme.SList(Scheme.Atom("lambda") :: Scheme.DottedList(params, vararg) :: body) =>
-      Interpreter.lambda(params.map(show), body, Some(show(vararg)))
+      Interpreter.lambda(params.map(mkString), body, Some(mkString(vararg)))
     case Scheme.SList(List(Scheme.Atom("set!"), Scheme.Atom(id), value)) =>
       for
         newValue <- interpret(value)
@@ -180,7 +187,7 @@ def interpreterCompiler[M[_]](using s: Stateful[M, Context])(using me: MonadErro
                 lambdaContext = closure.provide(params.zip(args) ++ varargArgument)
                 bodyResult <- s.set(lambdaContext) *> body.traverse(interpret[ExecutionAlg]).foldMap(compiler[M]) <* s.set(oldContext)
               yield bodyResult.last
-            case _ => me.raiseError(RuntimeError.NotFunction("Primitive not found", show(func)))
+            case _ => me.raiseError(RuntimeError.NotFunction("Primitive not found", mkString(func)))
 
 
 def errorCompiler[M[_]](using me: MonadError[M, RuntimeError]): ErrorAlg ~> M =

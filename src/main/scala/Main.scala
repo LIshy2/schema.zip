@@ -8,7 +8,7 @@ import cats.implicits.*
 import scopt.OParser
 
 import java.io.FileReader
-import interpreter.{Context, ErrorAlg, ExecutionAlg, Interpreter, InterpreterAlg, Primitives, RuntimeError, Scheme, compiler, interpret, primitives, numOperator, eqNumOperator, eqStrOperators, equalsOperators, listOperators, boolOperator, show}
+import interpreter.{Context, ErrorAlg, ExecutionAlg, Interpreter, InterpreterAlg, Primitives, RuntimeError, Scheme, compiler, interpret, primitives, numOperator, eqNumOperator, eqStrOperators, equalsOperators, listOperators, boolOperator, mkString}
 
 import scala.io.Source
 
@@ -26,9 +26,9 @@ def buildParser(): OParser[Unit, Config] =
 
 def showError(error: RuntimeError): Unit =
   error match
-    case RuntimeError.ArgsCount(expected: Integer, found: List[Scheme]) => println(s"Wrong arguments.\nExpected $expected, found ${found.map(show).mkString(" ")}")
-    case RuntimeError.TypeMismatch(expected: String, found: Scheme) => println(s"Type mismatch.\nExpected $expected, found ${show(found)}")
-    case RuntimeError.BadSpecialForm(message: String, expr: Scheme) => println(s"Bad Form.\nMessage: $message\nExpr: ${show(expr)}")
+    case RuntimeError.ArgsCount(expected: Integer, found: List[Scheme]) => println(s"Wrong arguments.\nExpected $expected, found ${found.map(mkString).mkString(" ")}")
+    case RuntimeError.TypeMismatch(expected: String, found: Scheme) => println(s"Type mismatch.\nExpected $expected, found ${mkString(found)}")
+    case RuntimeError.BadSpecialForm(message: String, expr: Scheme) => println(s"Bad Form.\nMessage: $message\nExpr: ${mkString(expr)}")
     case RuntimeError.NotFunction(message: String, funcId: String) => println(s"Not function.\nMessage: $message\nFunc: $funcId")
     case RuntimeError.UnboundVar(message: String, id: String) => println(s"Unbound variable.\nMessage: $message\nId: $id")
     case RuntimeError.ParseError(message: String) => println(s"Parse error.\nMessage: $message")

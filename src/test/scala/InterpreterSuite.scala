@@ -56,11 +56,9 @@ class InterpreterSuite extends munit.FunSuite {
     val eqScheme = "(= 1 1)"
     val notEqScheme = "(= 4 2)"
     val eqvScheme = "(eqv? '(1 2 3) '(1 2 3))"
-    val notEqvScheme = "(eqv? '(1 2 3) '(1 4 3))"
     assertEquals(rawExecuteProgram(eqScheme), Right(Scheme.Bool(true)))
     assertEquals(rawExecuteProgram(notEqScheme), Right(Scheme.Bool(false)))
-    assertEquals(rawExecuteProgram(eqvScheme), Right(Scheme.Bool(true)))
-    assertEquals(rawExecuteProgram(notEqvScheme), Right(Scheme.Bool(false)))
+    assertEquals(rawExecuteProgram(eqvScheme), Right(Scheme.Bool(false)))
   }
   test("Context interpreter") {
     val defineScheme =

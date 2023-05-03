@@ -4,6 +4,10 @@ import cats.{Applicative, Monad, MonadError}
 import cats.syntax.*
 import cats.implicits.*
 
+import java.io.{BufferedReader, File, FileReader, InputStreamReader, PrintWriter}
+import java.util.stream.Collectors
+import scala.collection.immutable.List
+
 def num[M[_]](x: Scheme)(using me: MonadError[M, RuntimeError]): M[Int] =
   x match
     case Scheme.Number(value) => value.pure[M]
@@ -24,6 +28,16 @@ def vector[M[_]](x: Scheme)(using me: MonadError[M, RuntimeError]): M[Array[Sche
     case Scheme.Vector(value) => value.pure[M]
     case s@_ => me.raiseError(RuntimeError.TypeMismatch("Vector", s))
 
+def port[M[_]](x: Scheme)(using me: MonadError[M, RuntimeError]): M[PortHandler] =
+  x match
+    case Scheme.Port(value) => value.pure[M]
+    case s@_ => me.raiseError(RuntimeError.TypeMismatch("Port", s))
+
+val stdinPort = Scheme.Port(PortHandler.ReaderPort(BufferedReader(InputStreamReader(System.in))))
+val stdoutPort = Scheme.Port(PortHandler.WriterPort(PrintWriter(System.out)))
+
+def fileReaderPort(filename: String): Scheme = Scheme.Port(PortHandler.ReaderPort(BufferedReader(FileReader(filename))))
+def fileWriterPort(filename: String): Scheme = Scheme.Port(PortHandler.WriterPort(PrintWriter(new File(filename))))
 
 trait NumOperators[M[_]]:
   def plus(a: Scheme, b: Scheme): M[Scheme]
@@ -287,6 +301,69 @@ given vectorOperators[M[_]] (using me: MonadError[M, RuntimeError]): VectorOpera
     yield Scheme.Vector(vec)
 
 
+enum FileMode:
+  case Reader
+  case Writer
+
+trait IOOperators[M[_]]:
+  def makePort(mode: FileMode, filename: Scheme): M[Scheme]
+
+  def closePort(port: Scheme): M[Scheme]
+
+  def read(port: Scheme): M[Scheme]
+
+  def write(value: Scheme, port: Scheme): M[Scheme]
+
+  def readContents(filename: Scheme): M[Scheme]
+
+object IOOperators:
+  def apply[M[_]](using op: IOOperators[M]): IOOperators[M] = op
+
+
+given ioOperators[M[_]] (using me: MonadError[M, RuntimeError]): IOOperators[M] with
+  def makePort(mode: FileMode, filename: Scheme): M[Scheme] =
+    for
+      filenameM <- str(filename)
+      result <- mode match
+        case FileMode.Reader => fileReaderPort(filenameM).pure[M]
+        case FileMode.Writer => fileWriterPort(filenameM).pure[M]
+    yield result
+
+  def closePort(p: Scheme): M[Scheme] =
+    for
+      portM <- port(p)
+      _ = portM match
+        case PortHandler.ReaderPort(br) => br.close()
+        case PortHandler.WriterPort(pw) => pw.close()
+    yield Scheme.Port(portM)
+
+  def read(p: Scheme): M[Scheme] =
+    for
+      portM <- port(p)
+      result <- portM match
+        case PortHandler.ReaderPort(br) => br.readLine().pure[M]
+        case _ => me.raiseError(RuntimeError.BadSpecialForm("Wrong port mode", p))
+    yield Scheme.Str(result)
+
+
+  def write(value: Scheme, p: Scheme): M[Scheme] =
+    for
+      portM <- port(p)
+      _ = portM match
+        case PortHandler.WriterPort(pw) => pw.write(mkString(value))
+        case _ => me.raiseError(RuntimeError.BadSpecialForm("Wrong port mode", p))
+    yield value
+
+
+  def readContents(filename: Scheme): M[Scheme] =
+    for
+      portM <- makePort(FileMode.Reader, filename) >>= port
+      result <- portM match
+        case PortHandler.ReaderPort(br) => br.lines().collect(Collectors.joining(System.lineSeparator())).pure[M]
+        case _ => me.raiseError(RuntimeError.BadSpecialForm("Wrong port mode", Scheme.Port(portM)))
+    yield Scheme.Str(result)
+
+
 // All algebras in one + arg count checking
 trait Primitives[M[_]]:
 
@@ -341,6 +418,16 @@ trait Primitives[M[_]]:
   def vectorRef(arg: List[Scheme]): M[Scheme]
 
   def vectorSet(arg: List[Scheme]): M[Scheme]
+
+  def makePort(mode: FileMode, arg: List[Scheme]): M[Scheme]
+
+  def closePort(arg: List[Scheme]): M[Scheme]
+
+  def read(arg: List[Scheme]): M[Scheme]
+
+  def write(arg: List[Scheme]): M[Scheme]
+
+  def readContents(arg: List[Scheme]): M[Scheme]
 
 
 object Primitives:
@@ -482,6 +569,37 @@ given primitives[M[_] : NumOperators : EqNumOperators : BoolOperators : EqStrOpe
     arg match
       case List(x, ind, value) => VectorOperators[M].set(x, ind, value)
       case s@_ => me.raiseError(RuntimeError.ArgsCount(3, s))
+
+  def makePort(mode: FileMode, arg: List[Scheme]): M[Scheme] =
+    arg match
+      case List(filename) => IOOperators[M].makePort(mode, filename)
+      case s@_ => me.raiseError(RuntimeError.ArgsCount(1, s))
+
+
+  def closePort(arg: List[Scheme]): M[Scheme] =
+    arg match
+      case List(port) => IOOperators[M].closePort(port)
+      case s@_ => me.raiseError(RuntimeError.ArgsCount(1, s))
+
+
+  def read(arg: List[Scheme]): M[Scheme] =
+    arg match
+      case List() => IOOperators[M].read(stdinPort)
+      case List(port) => IOOperators[M].read(port)
+      case s@_ => me.raiseError(RuntimeError.ArgsCount(1, s))
+
+
+  def write(arg: List[Scheme]): M[Scheme] =
+    arg match
+      case List(value) => IOOperators[M].write(value, stdoutPort)
+      case List(value, port) => IOOperators[M].write(value, port)
+      case s@_ => me.raiseError(RuntimeError.ArgsCount(2, s))
+
+
+  def readContents(arg: List[Scheme]): M[Scheme] =
+    arg match
+      case List(filename) => IOOperators[M].readContents(filename)
+      case s@_ => me.raiseError(RuntimeError.ArgsCount(1, s))
 
 
 def operatorM[M[_] : Monad](operator: (Scheme, Scheme) => M[Scheme]): (M[Scheme], M[Scheme]) => M[Scheme] =

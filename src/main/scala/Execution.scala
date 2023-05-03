@@ -3,7 +3,7 @@ import cats.syntax.*
 import cats.{InjectK, MonadError, ~>}
 import cats.data.{EitherK, StateT}
 import cats.free.Free
-import interpreter.{Context, ErrorAlg, ExecutionAlg, Execution, InterpreterAlg, Primitives, RuntimeError, Scheme, interpret, show, compiler}
+import interpreter.{Context, ErrorAlg, ExecutionAlg, Execution, InterpreterAlg, Primitives, RuntimeError, Scheme, interpret, mkString, compiler}
 
 import scala.io.{Source, StdIn}
 
@@ -53,7 +53,7 @@ def replCompiler[M[_]](using me: MonadError[M, RuntimeError]): ReplAlg ~> M =
               me.raiseError(RuntimeError.ParseError(msg))
 
         case ReplAlg.PrintResult(result) =>
-          println(show(result))
+          println(mkString(result))
           ().pure[M]
 
 type Repl[A] = Free[ReplAlg, A]
