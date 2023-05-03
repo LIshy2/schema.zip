@@ -25,15 +25,16 @@ To execute a Scheme program from a file named myprogram.scm, run:
 
 The interpreter supports the following Scheme R5RS features:
 
-| Feature    | Supported   |
-|------------|-------------|
+| Feature    | Supported          |
+|------------|--------------------|
 | define     | :white_check_mark: |
 | lambda     | :white_check_mark: |
 | arithmetic | :white_check_mark: |
 | lists      | :white_check_mark: |
-| vectors    | :x:         |
-| macros     | :x:         |
-| call/cc    | :x:         |
+| vectors    | :white_check_mark: |
+| ports      | :x:                |
+| macros     | :x:                |
+| call/cc    | :x:                |
 
 ## Running Tests
 
