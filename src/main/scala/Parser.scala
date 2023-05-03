@@ -7,9 +7,11 @@ enum AST:
   case Atom(value: String)
   case SList(list: List[AST])
   case DottedList(head: List[AST], tail: AST)
+  case Vector(data: List[AST])
   case Number(value: Int)
   case Str(value: String)
   case Bool(value: Boolean)
+  case Character(value: Char)
 
 
 object ASTParser extends RegexParsers:
@@ -27,6 +29,10 @@ object ASTParser extends RegexParsers:
     case "#f" => AST.Bool(false)
   }
 
+  private def charParser: Parser[AST] = "#\\.".r ^^ {
+    s => AST.Character(s.last)
+  }
+
   private val letters = "[a-z]".r
   private val specialInitial = "[!$%&|*/:<=>?^_~]".r
   private val digit = "\\d".r
@@ -39,7 +45,7 @@ object ASTParser extends RegexParsers:
 
   private def listParser: Parser[AST] =
     for
-      list <- rep1(exprParser)
+      list <- rep(exprParser)
     yield AST.SList(list)
 
   private def dottedParser: Parser[AST] =
@@ -55,6 +61,13 @@ object ASTParser extends RegexParsers:
       expr <- exprParser
     yield AST.SList(List(AST.Atom("quote"), expr))
 
+  private def vectorParser: Parser[AST] =
+    for
+      _ <- "#(" ^^ identity
+      data <- rep(exprParser)
+      _ <- ")" ^^ identity
+    yield AST.Vector(data)
+
 
   private def exprParser: Parser[AST] =
     val parseList = for
@@ -62,7 +75,7 @@ object ASTParser extends RegexParsers:
       data <- dottedParser | listParser
       _ <- ")" ^^ identity
     yield data
-    boolParser | numberParser | stringParser | atomParser | quoteParser | parseList
+    boolParser | numberParser | stringParser | charParser | atomParser | quoteParser | vectorParser | parseList
 
 
   def parseExpr(data: String): ParseResult[AST] =
@@ -80,3 +93,5 @@ def astToScheme(ast: AST): Scheme =
     case AST.Number(value) => Scheme.Number(value)
     case AST.Str(value) => Scheme.Str(value)
     case AST.Bool(value) => Scheme.Bool(value)
+    case AST.Character(value) => Scheme.Character(value)
+    case AST.Vector(value) => Scheme.Vector(value.map(astToScheme).toArray)

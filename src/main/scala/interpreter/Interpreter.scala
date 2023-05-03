@@ -18,11 +18,13 @@ case class PrimitiveFunc[M[_]](name: String, f: List[Scheme] => M[Scheme]):
 
 enum Scheme:
   case Atom(value: String)
-  case SList(list: List[Scheme])
-  case DottedList(head: List[Scheme], tail: Scheme)
   case Number(value: Int)
   case Str(value: String)
   case Bool(value: Boolean)
+  case Character(value: Char)
+  case Vector(value: Array[Scheme])
+  case SList(list: List[Scheme])
+  case DottedList(head: List[Scheme], tail: Scheme)
   case PrimitiveOperator[M[_]](func: PrimitiveFunc[M])
   case Func(params: List[String], body: List[Scheme], closure: Context, vararg: Option[String])
 
@@ -96,7 +98,8 @@ def interpret[F[_]](scheme: Scheme)(using InjectK[InterpreterAlg, F])(using Inje
     case s@Scheme.Number(_) => Interpreter.canonical(s)
     case s@Scheme.Bool(_) => Interpreter.canonical(s)
     case s@Scheme.Str(_) => Interpreter.canonical(s)
-    case Scheme.Atom(id) => Interpreter.variable(id)
+    case s@Scheme.Character(_) => Interpreter.canonical(s)
+    case s@Scheme.Vector(_) => Interpreter.canonical(s)
     case Scheme.SList(List(Scheme.Atom("quote"), data)) => Interpreter.canonical(data)
     case Scheme.SList(List(Scheme.Atom("if"), pred, th, el)) =>
       for
@@ -106,6 +109,7 @@ def interpret[F[_]](scheme: Scheme)(using InjectK[InterpreterAlg, F])(using Inje
           case _ => Error.raise(RuntimeError.TypeMismatch("bool", pred))
         result <- if b then interpret(th) else interpret(el)
       yield result
+    case Scheme.Atom(id) => Interpreter.variable(id)
     case Scheme.SList(List(Scheme.Atom("define"), Scheme.Atom(id), value)) =>
       for
         newValue <- interpret(value)

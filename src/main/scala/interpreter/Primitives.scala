@@ -1,6 +1,6 @@
 package interpreter
 
-import cats.MonadError
+import cats.{Applicative, Monad, MonadError}
 import cats.syntax.*
 import cats.implicits.*
 
@@ -18,6 +18,11 @@ def str[M[_]](x: Scheme)(using me: MonadError[M, RuntimeError]): M[String] =
   x match
     case Scheme.Str(value) => value.pure[M]
     case s@_ => me.raiseError(RuntimeError.TypeMismatch("Str", s))
+
+def vector[M[_]](x: Scheme)(using me: MonadError[M, RuntimeError]): M[Array[Scheme]] =
+  x match
+    case Scheme.Vector(value) => value.pure[M]
+    case s@_ => me.raiseError(RuntimeError.TypeMismatch("Vector", s))
 
 
 trait NumOperators[M[_]]:
@@ -227,27 +232,59 @@ given listOperators[M[_]] (using me: MonadError[M, RuntimeError]): ListOperators
 trait EqualsOperators[M[_]]:
   def eqv(a: Scheme, b: Scheme): M[Scheme]
 
-  def eq(a: Scheme, b: Scheme): M[Scheme] = eqv(a, b)
+  def eq(a: Scheme, b: Scheme): M[Scheme]
 
-  def equals(a: Scheme, b: Scheme): M[Scheme] = equals(a, b)
 
 object EqualsOperators:
   def apply[M[_]](using op: EqualsOperators[M]): EqualsOperators[M] = op
 
 
-given equalsOperators[M[_]] (using me: MonadError[M, RuntimeError]): EqualsOperators[M] with
+given equalsOperators[M[_] : Monad]: EqualsOperators[M] with
   def eqv(a: Scheme, b: Scheme): M[Scheme] =
     (a, b) match
       case (Scheme.Bool(valA), Scheme.Bool(valB)) => Scheme.Bool(valA == valB).pure[M]
       case (Scheme.Number(valA), Scheme.Number(valB)) => Scheme.Bool(valA == valB).pure[M]
       case (Scheme.Str(valA), Scheme.Str(valB)) => Scheme.Bool(valA == valB).pure[M]
       case (Scheme.Atom(idA), Scheme.Atom(idB)) => Scheme.Bool(idA == idB).pure[M]
-      case (Scheme.SList(listA), Scheme.SList(listB)) =>
-        for
-          eqList <- listA.zip(listB).traverse((x, y) => eqv(x, y) >>= bool)
-          lengthEq = listA.length == listB.length
-        yield Scheme.Bool(lengthEq && eqList.forall(identity))
+      case (Scheme.SList(listA), Scheme.SList(listB)) => Scheme.Bool(listA eq listB).pure[M]
+      case (Scheme.Vector(arrayA), Scheme.Vector(arrayB)) => Scheme.Bool(arrayA eq arrayB).pure[M]
+      case (Scheme.Character(valA), Scheme.Character(valB)) => Scheme.Bool(valA == valB).pure[M]
       case _ => Scheme.Bool(false).pure[M]
+
+  def eq(a: Scheme, b: Scheme): M[Scheme] = eqv(a, b)
+
+trait VectorOperators[M[_]]:
+  def make(k: Scheme, fill: Scheme): M[Scheme]
+
+  def ref(x: Scheme, ind: Scheme): M[Scheme]
+
+  def set(x: Scheme, ind: Scheme, value: Scheme): M[Scheme]
+
+object VectorOperators:
+  def apply[M[_]](using op: VectorOperators[M]): VectorOperators[M] = op
+
+
+given vectorOperators[M[_]] (using me: MonadError[M, RuntimeError]): VectorOperators[M] with
+  def make(k: Scheme, fill: Scheme): M[Scheme] =
+    for
+      kNum <- num(k)
+    yield Scheme.Vector(Array.fill(kNum)(fill))
+
+
+  def ref(x: Scheme, ind: Scheme): M[Scheme] =
+    for
+      vec <- vector(x)
+      i <- num(ind)
+      _ <- me.raiseUnless(0 <= i && i < vec.length)(RuntimeError.BadSpecialForm("Vector out of bounds", ind))
+    yield vec(i)
+
+  def set(x: Scheme, ind: Scheme, value: Scheme): M[Scheme] =
+    for
+      vec <- vector(x)
+      i <- num(ind)
+      _ <- me.raiseUnless(0 <= i && i < vec.length)(RuntimeError.BadSpecialForm("Vector out of bounds", ind))
+      _ = vec.update(i, value)
+    yield Scheme.Vector(vec)
 
 
 // All algebras in one + arg count checking
@@ -299,7 +336,12 @@ trait Primitives[M[_]]:
 
   def dataEq(arg: List[Scheme]): M[Scheme]
 
-  def dataEquals(arg: List[Scheme]): M[Scheme]
+  def vectorMake(arg: List[Scheme]): M[Scheme]
+
+  def vectorRef(arg: List[Scheme]): M[Scheme]
+
+  def vectorSet(arg: List[Scheme]): M[Scheme]
+
 
 object Primitives:
   def apply[M[_]](using op: Primitives[M]): Primitives[M] = op
@@ -424,14 +466,25 @@ given primitives[M[_] : NumOperators : EqNumOperators : BoolOperators : EqStrOpe
       case List(a, b) => EqualsOperators[M].eq(a, b)
       case s@_ => me.raiseError(RuntimeError.ArgsCount(2, s))
 
-
-  def dataEquals(arg: List[Scheme]): M[Scheme] =
+  def vectorMake(arg: List[Scheme]): M[Scheme] =
     arg match
-      case List(a, b) => EqualsOperators[M].equals(a, b)
+      case List(k, fill) => VectorOperators[M].make(k, fill)
       case s@_ => me.raiseError(RuntimeError.ArgsCount(2, s))
 
 
-def operatorM[M[_]](operator: (Scheme, Scheme) => M[Scheme])(using me: MonadError[M, RuntimeError]): (M[Scheme], M[Scheme]) => M[Scheme] =
+  def vectorRef(arg: List[Scheme]): M[Scheme] =
+    arg match
+      case List(x, ind) => VectorOperators[M].ref(x, ind)
+      case s@_ => me.raiseError(RuntimeError.ArgsCount(2, s))
+
+
+  def vectorSet(arg: List[Scheme]): M[Scheme] =
+    arg match
+      case List(x, ind, value) => VectorOperators[M].set(x, ind, value)
+      case s@_ => me.raiseError(RuntimeError.ArgsCount(3, s))
+
+
+def operatorM[M[_] : Monad](operator: (Scheme, Scheme) => M[Scheme]): (M[Scheme], M[Scheme]) => M[Scheme] =
   (aM: M[Scheme], bM: M[Scheme]) =>
     for
       a <- aM

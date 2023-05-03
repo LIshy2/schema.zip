@@ -53,5 +53,7 @@ object Context:
       "cons" -> wrapPrimitive("cons", Primitives[M].cons),
       "eq?" -> wrapPrimitive("eq?", Primitives[M].dataEq),
       "eqv?" -> wrapPrimitive("eqv?", Primitives[M].dataEqv),
-      "equal?" -> wrapPrimitive("equal?", Primitives[M].dataEquals)
+      "make-vector" -> wrapPrimitive("make-vector", Primitives[M].vectorMake),
+      "vector-set!" -> wrapPrimitive("vector-set!", Primitives[M].vectorSet),
+      "vector-ref" -> wrapPrimitive("vector-ref", Primitives[M].vectorRef),
     ))
