@@ -3,7 +3,7 @@ import cats.syntax.*
 import cats.{InjectK, MonadError, ~>}
 import cats.data.{EitherK, StateT}
 import cats.free.Free
-import interpreter.{Context, ErrorAlg, ExecutionAlg, Execution, InterpreterAlg, Primitives, RuntimeError, Scheme, interpret, mkString, compiler}
+import interpreter.{Context, ErrorAlg, InterpreterAlg, Primitives, PrimitivesAlg, RuntimeError, Scheme, interpret, mkString, schemeCompiler}
 
 import scala.io.{Source, StdIn}
 
@@ -56,12 +56,8 @@ def replCompiler[M[_]](using me: MonadError[M, RuntimeError]): ReplAlg ~> M =
           println(mkString(result))
           ().pure[M]
 
-type Repl[A] = Free[ReplAlg, A]
 
-type InteractiveExecutionAlg[A] = EitherK[ReplAlg, ExecutionAlg, A]
-type InteractiveExecution[A] = Free[InteractiveExecutionAlg, A]
-
-def runRepl[F[_]](using InjectK[ReplAlg, F])(using InjectK[InterpreterAlg, F])(using InjectK[ErrorAlg, F]): Free[F, Unit] =
+def runRepl[F[_]](using InjectK[ReplAlg, F])(using InjectK[InterpreterAlg, F])(using InjectK[ErrorAlg, F])(using InjectK[PrimitivesAlg, F]): Free[F, Unit] =
   for
     newLine <- Repl.readLine
     result <- interpret(newLine)
@@ -69,13 +65,13 @@ def runRepl[F[_]](using InjectK[ReplAlg, F])(using InjectK[InterpreterAlg, F])(u
     _ <- runRepl
   yield ()
 
-def runModule[F[_]](filename: String)(using InjectK[ReplAlg, F])(using InjectK[InterpreterAlg, F])(using InjectK[ErrorAlg, F]): Free[F, Unit] =
+def runModule[F[_]](filename: String)(using InjectK[ReplAlg, F])(using InjectK[InterpreterAlg, F])(using InjectK[ErrorAlg, F])(using InjectK[PrimitivesAlg, F]): Free[F, Unit] =
   for
     body <- Repl.readModule(filename)
     result <- body.traverse(interpret)
   yield result.last
 
-def run[F[_]](filename: Option[String], interactive: Boolean)(using InjectK[ReplAlg, F])(using InjectK[InterpreterAlg, F])(using InjectK[ErrorAlg, F]): Free[F, Unit] =
+def run[F[_]](filename: Option[String], interactive: Boolean)(using InjectK[ReplAlg, F])(using InjectK[InterpreterAlg, F])(using InjectK[ErrorAlg, F])(using InjectK[PrimitivesAlg, F]): Free[F, Unit] =
   for
     _ <- filename match
       case Some(module) => runModule(module)
@@ -90,11 +86,13 @@ def run[F[_]](filename: Option[String], interactive: Boolean)(using InjectK[Repl
 type ExecutionResult[A] = Either[RuntimeError, A]
 
 def rawExecuteProgram[M[_]](input: String)(using me: MonadError[M, RuntimeError])(using Primitives[StateT[M, Context, _]]): M[Scheme] =
+  type Algebra[A] = EitherK[InterpreterAlg, EitherK[ErrorAlg, PrimitivesAlg, _], A]
+
   val parseResult = ASTParser.parseExprSeq(input)
   parseResult match
     case ASTParser.Success(astList, _) =>
       val body = astList.map(astToScheme)
-      val semantic = body.traverse(interpret[ExecutionAlg]).foldMap(compiler[StateT[M, Context, _]])
+      val semantic = body.traverse(interpret[Algebra]).foldMap(schemeCompiler[StateT[M, Context, _]])
       semantic.runA(Context.withPrimitives[StateT[M, Context, _]]).map(_.last)
     case ASTParser.Failure(msg, _) =>
       me.raiseError(RuntimeError.ParseError(msg))

@@ -8,7 +8,7 @@ import cats.implicits.*
 import scopt.OParser
 
 import java.io.FileReader
-import interpreter.{Context, ErrorAlg, ExecutionAlg, Interpreter, InterpreterAlg, Primitives, RuntimeError, Scheme, compiler, interpret, primitives, numOperator, eqNumOperator, eqStrOperators, equalsOperators, listOperators, boolOperator, mkString}
+import interpreter.{Context, ErrorAlg, Interpreter, InterpreterAlg, Primitives, PrimitivesAlg, RuntimeError, Scheme, interpret, mkString, schemeCompiler}
 
 import scala.io.Source
 
@@ -36,8 +36,8 @@ def showError(error: RuntimeError): Unit =
 
 def execute(config: Config): ExecutionResult[Unit] =
   type StateExecutionResult[A] = StateT[ExecutionResult, Context, A]
-  type Algebra[A] = EitherK[ReplAlg, EitherK[InterpreterAlg, ErrorAlg, _], A]
-  run[Algebra](config.filename, config.repl).foldMap(replCompiler[StateExecutionResult] or compiler[StateExecutionResult]).runA(Context.withPrimitives[StateExecutionResult])
+  type Algebra[A] = EitherK[ReplAlg, EitherK[InterpreterAlg, EitherK[ErrorAlg, PrimitivesAlg, _], _], A]
+  run[Algebra](config.filename, config.repl).foldMap(replCompiler[StateExecutionResult] or schemeCompiler[StateExecutionResult]).runA(Context.withPrimitives[StateExecutionResult])
 
 @main
 def main(args: String*): Unit = {
