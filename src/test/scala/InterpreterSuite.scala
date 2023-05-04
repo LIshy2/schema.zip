@@ -1,12 +1,5 @@
 import interpreter.{
   RuntimeError, Scheme, Context,
-  primitives,
-  numOperator,
-  eqNumOperator,
-  eqStrOperators,
-  equalsOperators,
-  boolOperator,
-  listOperators
 }
 
 class InterpreterSuite extends munit.FunSuite {
@@ -17,7 +10,7 @@ class InterpreterSuite extends munit.FunSuite {
     val divScheme = "(/ 7 2)"
     val mulScheme = "(* 5 2)"
     val modScheme = "(mod 15 4)"
-    assertEquals(rawExecuteProgram[ExecutionResult](plusScheme), Right(Scheme.Number(3)))
+    assertEquals(rawExecuteProgram[ExecutionResult](plusScheme),  Right(Scheme.Number(3)))
     assertEquals(rawExecuteProgram[ExecutionResult](minusScheme), Right(Scheme.Number(8)))
     assertEquals(rawExecuteProgram[ExecutionResult](divScheme), Right(Scheme.Number(3)))
     assertEquals(rawExecuteProgram[ExecutionResult](mulScheme), Right(Scheme.Number(10)))

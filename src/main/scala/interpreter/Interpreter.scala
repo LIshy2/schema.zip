@@ -195,8 +195,7 @@ def interpreterCompiler[M[_]](using s: Stateful[M, Context])(using me: MonadErro
         case InterpreterAlg.UpdateBinding(name: String, x: Scheme) =>
           for
             ctx <- s.get
-            newCtx <- ctx.set(name, x)
-            _ <- s.set(newCtx)
+            _ <- ctx.set(name, x)
           yield ()
         case InterpreterAlg.Context =>
           for

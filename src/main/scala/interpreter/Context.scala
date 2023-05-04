@@ -4,18 +4,26 @@ import cats.syntax.*
 import cats.implicits.*
 import cats.MonadError
 
-class Context(val state: Map[String, Scheme]):
+class SchemeRef(var currentValue: Scheme):
+  def set(newValue: Scheme): Unit =
+    currentValue = newValue
+
+  def get: Scheme = currentValue
+
+
+class Context(val state: Map[String, SchemeRef]):
 
   def exists[M[_]](id: String): Boolean = state.contains(id)
 
-  def get[M[_]](id: String)(using me: MonadError[M, RuntimeError]): M[Scheme] = me.fromOption(state.get(id), RuntimeError.UnboundVar("", id))
+  def get[M[_]](id: String)(using me: MonadError[M, RuntimeError]): M[Scheme] = me.fromOption(state.get(id).map(_.get), RuntimeError.UnboundVar("", id))
 
-  def set[M[_]](id: String, value: Scheme)(using me: MonadError[M, RuntimeError]): M[Context] =
+  def set[M[_]](id: String, value: Scheme)(using me: MonadError[M, RuntimeError]): M[Unit] =
     if this.exists(id) then
-      Context(state.updated(id, value)).pure[M]
-    else me.raiseError(RuntimeError.UnboundVar("", id))
+      state.get(id).map(_.set(value))
+      ().pure[M]
+    else me.raiseError(RuntimeError.UnboundVar("Unbounded var in set", id))
 
-  def define(id: String, value: Scheme): Context = Context(state.updated(id, value))
+  def define(id: String, value: Scheme): Context = new Context(state.updated(id, SchemeRef(value)))
 
   def provide(newContext: List[(String, Scheme)]): Context =
     newContext.foldLeft(this) {
@@ -23,13 +31,17 @@ class Context(val state: Map[String, Scheme]):
     }
 
 object Context:
-  def empty[M[_]]: Context = new Context(Map.empty[String, Scheme])
+
+  def apply(map: Map[String, Scheme]): Context =
+    new Context(map.map((key, value) => (key, SchemeRef(value))))
+
+  def empty[M[_]]: Context = new Context(Map.empty[String, SchemeRef])
 
   def withPrimitives[M[_]]: Context =
     def wrapPrimitive(name: String, f: List[Scheme] => PrimitivesAlg[Scheme]): Scheme =
       Scheme.PrimitiveOperator(PrimitiveFunc(name, f))
 
-    new Context(Map[String, Scheme](
+    Context(Map[String, Scheme](
       "+" -> wrapPrimitive("+", PrimitivesAlg.Plus.apply),
       "-" -> wrapPrimitive("+", PrimitivesAlg.Minus.apply),
       "/" -> wrapPrimitive("/", PrimitivesAlg.Div.apply),

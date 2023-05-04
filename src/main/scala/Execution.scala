@@ -85,7 +85,7 @@ def run[F[_]](filename: Option[String], interactive: Boolean)(using InjectK[Repl
 
 type ExecutionResult[A] = Either[RuntimeError, A]
 
-def rawExecuteProgram[M[_]](input: String)(using me: MonadError[M, RuntimeError])(using Primitives[StateT[M, Context, _]]): M[Scheme] =
+def rawExecuteProgram[M[_]](input: String)(using me: MonadError[M, RuntimeError]): M[Scheme] =
   type Algebra[A] = EitherK[InterpreterAlg, EitherK[ErrorAlg, PrimitivesAlg, _], A]
 
   val parseResult = ASTParser.parseExprSeq(input)
