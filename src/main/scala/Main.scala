@@ -8,7 +8,7 @@ import cats.implicits.*
 import scopt.OParser
 
 import java.io.FileReader
-import interpreter.{Context, ErrorAlg, Interpreter, InterpreterAlg, Primitives, PrimitivesAlg, RuntimeError, Scheme, interpret, mkString, schemeCompiler}
+import interpreter.{Context, ErrorAlg, Interpreter, InterpreterAlg, PrimitivesAlg, RuntimeError, Scheme, interpret, mkString, schemeCompiler}
 
 import scala.io.Source
 
