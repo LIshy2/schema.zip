@@ -3,7 +3,7 @@ import cats.syntax.*
 import cats.{InjectK, MonadError, ~>}
 import cats.data.{EitherK, StateT}
 import cats.free.Free
-import interpreter.{Context, ErrorAlg, InterpreterAlg, Primitives, PrimitivesAlg, RuntimeError, Scheme, interpret, mkString, schemeCompiler}
+import interpreter.{Context, ErrorAlg, InterpreterAlg, PrimitivesAlg, RuntimeError, Scheme, interpret, mkString, schemeCompiler}
 
 import scala.io.{Source, StdIn}
 

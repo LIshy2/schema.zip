@@ -13,7 +13,7 @@ class SchemeRef(var currentValue: Scheme):
 
 class Context(val state: Map[String, SchemeRef]):
 
-  def exists[M[_]](id: String): Boolean = state.contains(id)
+  def exists(id: String): Boolean = state.contains(id)
 
   def get[M[_]](id: String)(using me: MonadError[M, RuntimeError]): M[Scheme] = me.fromOption(state.get(id).map(_.get), RuntimeError.UnboundVar("", id))
 
